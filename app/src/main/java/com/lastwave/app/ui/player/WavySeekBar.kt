@@ -640,8 +640,8 @@ fun MiniWavyProgress(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(10.dp)
-            .clip(RoundedCornerShape(5.dp)),
+            .height(14.dp)
+            .clip(RoundedCornerShape(7.dp)),
     ) {
         Canvas(
             modifier = Modifier.fillMaxSize(),
@@ -687,19 +687,21 @@ fun MiniWavyProgress(
                         return c * c * c * (c * (c * 6f - 15f) + 10f)
                     }
 
-                    val waveLength1Px = 70.dp.toPx()
-                    val waveLength2Px = 54.dp.toPx()
-                    val waveLength3Px = 40.dp.toPx()
+                    // Wavelengths widened for clear spacing between crest peaks
+                    val waveLength1Px = 114.dp.toPx()
+                    val waveLength2Px = 88.dp.toPx()
+                    val waveLength3Px = 68.dp.toPx()
 
-                    val amp1 = 2.4.dp.toPx() * ampMulti
-                    val amp2 = 1.8.dp.toPx() * ampMulti
-                    val amp3 = 2.8.dp.toPx() * ampMulti
+                    // Enhanced amplitudes for prominent wave crests
+                    val amp1 = 4.8.dp.toPx() * ampMulti
+                    val amp2 = 3.6.dp.toPx() * ampMulti
+                    val amp3 = 5.8.dp.toPx() * ampMulti
 
                     val currPhase1 = if (isPlaying) phase1 + 2.2f else 2.2f
                     val currPhase2 = if (isPlaying) phase2 + 1.2f else 1.2f
                     val currPhase3 = if (isPlaying) phase3 else 0f
 
-                    val transitionLengthPx = 20.dp.toPx()
+                    val transitionLengthPx = 28.dp.toPx()
                     val stepPx = 1.5.dp.toPx()
 
                     fun populateMiniWave(
@@ -748,7 +750,7 @@ fun MiniWavyProgress(
                     drawPath(
                         path = pathFilled1,
                         brush = Brush.verticalGradient(
-                            colors = listOf(layer1Light.copy(alpha = 0.32f), layer1Dark.copy(alpha = 0.08f)),
+                            colors = listOf(layer1Light.copy(alpha = 0.35f), layer1Dark.copy(alpha = 0.08f)),
                             startY = topWaveY,
                             endY = bottomY,
                         ),
@@ -756,7 +758,7 @@ fun MiniWavyProgress(
                     drawPath(
                         path = pathFilled2,
                         brush = Brush.verticalGradient(
-                            colors = listOf(layer2Light.copy(alpha = 0.42f), layer2Dark.copy(alpha = 0.12f)),
+                            colors = listOf(layer2Light.copy(alpha = 0.45f), layer2Dark.copy(alpha = 0.12f)),
                             startY = topWaveY,
                             endY = bottomY,
                         ),
@@ -764,7 +766,7 @@ fun MiniWavyProgress(
                     drawPath(
                         path = pathFilled3,
                         brush = Brush.verticalGradient(
-                            colors = listOf(layer3Light.copy(alpha = 0.60f), layer3Dark.copy(alpha = 0.22f)),
+                            colors = listOf(layer3Light.copy(alpha = 0.62f), layer3Dark.copy(alpha = 0.24f)),
                             startY = topWaveY,
                             endY = bottomY,
                         ),
@@ -773,20 +775,31 @@ fun MiniWavyProgress(
                         path = pathFilled3,
                         brush = Brush.horizontalGradient(
                             colors = listOf(
-                                layer3Light.copy(alpha = 0.35f),
-                                secondaryColor.copy(alpha = 0.22f),
-                                layer3Dark.copy(alpha = 0.40f)
+                                layer3Light.copy(alpha = 0.40f),
+                                secondaryColor.copy(alpha = 0.25f),
+                                layer3Dark.copy(alpha = 0.45f)
                             ),
                             startX = 0f,
                             endX = thumbX,
                         ),
                     )
 
-                    // Luminous Glow Contours
+                    // Soft Luminous Glow Halo on Crests
                     drawPath(
                         path = pathContour3,
                         brush = Brush.horizontalGradient(
-                            colors = listOf(layer3Light.copy(alpha = 0.50f), layer3Dark.copy(alpha = 0.30f)),
+                            colors = listOf(layer3Light.copy(alpha = 0.35f), layer3Dark.copy(alpha = 0.20f)),
+                            startX = 0f,
+                            endX = thumbX,
+                        ),
+                        style = Stroke(width = 3.2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                    )
+
+                    // Luminous Contour Line
+                    drawPath(
+                        path = pathContour3,
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(layer3Light.copy(alpha = 0.65f), layer3Dark.copy(alpha = 0.45f)),
                             startX = 0f,
                             endX = thumbX,
                         ),
