@@ -7,6 +7,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -15,9 +17,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -28,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
@@ -40,7 +45,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lastwave.app.playback.MusicPlayerState
+import com.lastwave.app.playback.PlaybackProgressState
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -556,5 +563,237 @@ fun WavySeekBar(
         isTranslucent = isTranslucent,
         trackKey = state.current?.let { it.videoId ?: "${it.artist}|${it.title}" },
     )
+}
+
+/**
+ * Compact, low-profile Wavy Seekbar specifically proportioned for MiniPlayer cards.
+ * Renders the same multi-depth gradient liquid fills and luminous glow in a streamlined 10dp track.
+ */
+@Composable
+fun MiniWavyProgress(
+    progressState: kotlinx.coroutines.flow.StateFlow<PlaybackProgressState>,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val state by progressState.collectAsStateWithLifecycle()
+    val boundedDurationMs = state.durationMs.coerceAtLeast(0L)
+    val boundedPositionMs = if (boundedDurationMs > 0L) state.positionMs.coerceIn(0L, boundedDurationMs) else 0L
+    val progressFraction = if (boundedDurationMs > 0L) {
+        (boundedPositionMs.toDouble() / boundedDurationMs.toDouble()).toFloat().coerceIn(0f, 1f)
+    } else 0f
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+    val inactiveColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+
+    val layer1Light = remember(tertiaryColor) { tertiaryColor.shiftTonal(lightnessDelta = +0.18f, saturationScale = 0.85f) }
+    val layer1Dark = remember(tertiaryColor) { tertiaryColor.shiftTonal(lightnessDelta = -0.15f, saturationScale = 1.30f) }
+    val layer2Dark = remember(secondaryColor) { secondaryColor.shiftTonal(lightnessDelta = -0.16f, saturationScale = 1.30f) }
+    val layer2Light = remember(secondaryColor) { secondaryColor.shiftTonal(lightnessDelta = +0.18f, saturationScale = 0.85f) }
+    val layer3Light = remember(primaryColor) { primaryColor.shiftTonal(lightnessDelta = +0.20f, saturationScale = 0.90f) }
+    val layer3Dark = remember(primaryColor) { primaryColor.shiftTonal(lightnessDelta = -0.14f, saturationScale = 1.35f) }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "MiniWaveAnimation")
+    val phase1 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "MiniPhase1",
+    )
+    val phase2 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3100, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "MiniPhase2",
+    )
+    val phase3 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1900, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "MiniPhase3",
+    )
+
+    val ampMulti by animateFloatAsState(
+        targetValue = if (isPlaying && boundedDurationMs > 0L) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow),
+        label = "MiniAmp",
+    )
+
+    val pathFilled1 = remember { Path() }
+    val pathFilled2 = remember { Path() }
+    val pathFilled3 = remember { Path() }
+    val pathContour1 = remember { Path() }
+    val pathContour2 = remember { Path() }
+    val pathContour3 = remember { Path() }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(10.dp)
+            .clip(RoundedCornerShape(5.dp)),
+    ) {
+        Canvas(
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            val width = size.width
+            val height = size.height
+            val centerY = height * 0.55f
+            val activeWidth = (width * progressFraction).coerceIn(0f, width)
+
+            // Inactive background bar
+            drawLine(
+                color = inactiveColor,
+                start = Offset(0f, centerY),
+                end = Offset(width, centerY),
+                strokeWidth = 2.5.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
+
+            if (activeWidth > 1f) {
+                val waveLength1Px = 54.dp.toPx()
+                val waveLength2Px = 72.dp.toPx()
+                val waveLength3Px = 42.dp.toPx()
+
+                val amp1 = 2.2.dp.toPx() * ampMulti
+                val amp2 = 1.6.dp.toPx() * ampMulti
+                val amp3 = 2.8.dp.toPx() * ampMulti
+
+                val currPhase1 = if (isPlaying) phase1 else 0f
+                val currPhase2 = if (isPlaying) -phase2 else 0f
+                val currPhase3 = if (isPlaying) phase3 * 1.25f else 0f
+
+                fun populateMiniWave(filled: Path, contour: Path, waveLength: Float, amplitude: Float, phase: Float) {
+                    filled.reset()
+                    contour.reset()
+                    filled.moveTo(0f, height)
+                    var first = true
+                    var x = 0f
+                    val step = 3f
+                    while (x <= activeWidth) {
+                        val angle = (x / waveLength) * 2f * PI.toFloat() + phase
+                        val y = centerY - sin(angle) * amplitude
+                        if (first) {
+                            filled.lineTo(x, y)
+                            contour.moveTo(x, y)
+                            first = false
+                        } else {
+                            filled.lineTo(x, y)
+                            contour.lineTo(x, y)
+                        }
+                        x += step
+                    }
+                    val endAngle = (activeWidth / waveLength) * 2f * PI.toFloat() + phase
+                    val endY = centerY - sin(endAngle) * amplitude
+                    filled.lineTo(activeWidth, endY)
+                    contour.lineTo(activeWidth, endY)
+                    filled.lineTo(activeWidth, height)
+                    filled.close()
+                }
+
+                populateMiniWave(pathFilled1, pathContour1, waveLength1Px, amp1, currPhase1)
+                populateMiniWave(pathFilled2, pathContour2, waveLength2Px, amp2, currPhase2)
+                populateMiniWave(pathFilled3, pathContour3, waveLength3Px, amp3, currPhase3)
+
+                val topWaveY = centerY - maxOf(amp1, maxOf(amp2, amp3))
+
+                // Fills
+                drawPath(
+                    path = pathFilled1,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(layer1Light.copy(alpha = 0.28f), layer1Dark.copy(alpha = 0.08f)),
+                        startY = topWaveY,
+                        endY = height,
+                    ),
+                )
+                drawPath(
+                    path = pathFilled2,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(layer2Light.copy(alpha = 0.35f), layer2Dark.copy(alpha = 0.12f)),
+                        startY = topWaveY,
+                        endY = height,
+                    ),
+                )
+                drawPath(
+                    path = pathFilled3,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(layer3Light.copy(alpha = 0.50f), layer3Dark.copy(alpha = 0.20f)),
+                        startY = topWaveY,
+                        endY = height,
+                    ),
+                )
+                drawPath(
+                    path = pathFilled3,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(layer3Light.copy(alpha = 0.30f), secondaryColor.copy(alpha = 0.20f), layer3Dark.copy(alpha = 0.35f)),
+                        startX = 0f,
+                        endX = activeWidth,
+                    ),
+                )
+
+                // Glow Halos
+                drawPath(
+                    path = pathContour3,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(layer3Light.copy(alpha = 0.35f), layer3Dark.copy(alpha = 0.22f)),
+                        startX = 0f,
+                        endX = activeWidth,
+                    ),
+                    style = Stroke(width = 4.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                )
+
+                // Contours
+                drawPath(
+                    path = pathContour1,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(layer1Light.copy(alpha = 0.40f), layer1Dark.copy(alpha = 0.30f)),
+                        startX = 0f,
+                        endX = activeWidth,
+                    ),
+                    style = Stroke(width = 0.9.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                )
+                drawPath(
+                    path = pathContour2,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(layer2Dark.copy(alpha = 0.65f), layer2Light.copy(alpha = 0.55f)),
+                        startX = 0f,
+                        endX = activeWidth,
+                    ),
+                    style = Stroke(width = 1.0.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                )
+                drawPath(
+                    path = pathContour3,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(layer3Light, layer3Dark),
+                        startX = 0f,
+                        endX = activeWidth,
+                    ),
+                    style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                )
+
+                // Baseline
+                drawLine(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(layer3Light, layer3Dark),
+                        startX = 0f,
+                        endX = activeWidth,
+                    ),
+                    start = Offset(0f, centerY),
+                    end = Offset(activeWidth, centerY),
+                    strokeWidth = 2.0.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+            }
+        }
+    }
 }
 

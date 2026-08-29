@@ -652,35 +652,13 @@ private fun MiniPlayer(
                         )
                     }
                 }
-                MiniPlayerProgress(progressState)
+                MiniWavyProgress(
+                    progressState = progressState,
+                    isPlaying = state.isPlaying,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun MiniPlayerProgress(progressState: StateFlow<PlaybackProgressState>) {
-    val state by progressState.collectAsStateWithLifecycle()
-    val progress = if (state.durationMs > 0) state.positionMs.toFloat() / state.durationMs else 0f
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .height(3.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-    ) {
-        // Scale an already measured layer instead of changing its width and
-        // forcing the mini-player through measure/layout on every ticker tick.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = progress.coerceIn(0f, 1f)
-                    transformOrigin = TransformOrigin(0f, 0.5f)
-                }
-                .background(MaterialTheme.colorScheme.primary),
-        )
     }
 }
 

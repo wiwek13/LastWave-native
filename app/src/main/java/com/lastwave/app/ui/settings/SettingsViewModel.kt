@@ -22,6 +22,7 @@ import com.lastwave.app.playback.NativeAudioEngine
 import com.lastwave.app.util.FileExportHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -87,8 +88,15 @@ class SettingsViewModel @Inject constructor(
     private val downloadedTrackDao: com.lastwave.app.data.local.db.DownloadedTrackDao,
     val playlistImportManager: com.lastwave.app.data.playlist.PlaylistImportManager,
     val innerTube: com.lastwave.app.data.music.InnerTubeMusicApi,
+    private val musicPlayer: dagger.Lazy<com.lastwave.app.playback.MusicPlayer>,
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
 ) : ViewModel() {
+
+    private val _streamCacheSizeBytes = MutableStateFlow(0L)
+    val streamCacheSizeBytes: StateFlow<Long> = _streamCacheSizeBytes.asStateFlow()
+
+    private val _streamCachedSongCount = MutableStateFlow(0)
+    val streamCachedSongCount: StateFlow<Int> = _streamCachedSongCount.asStateFlow()
 
     val authState: StateFlow<com.lastwave.app.data.model.AuthState> = authRepository.authState
 
@@ -188,6 +196,7 @@ class SettingsViewModel @Inject constructor(
                     _uiState.update { it.copy(recommendationExclusionCount = exclusions.size) }
                 }
         }
+        refreshStreamCacheStats()
     }
 
     fun refreshRecommendationExclusionCount() {
@@ -538,6 +547,34 @@ class SettingsViewModel @Inject constructor(
                     _uiState.update { it.copy(sessionKeyLoading = false, sessionKeyError = result.message) }
                 }
             }
+        }
+    }
+
+    fun refreshStreamCacheStats() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val bytes = runCatching { musicPlayer.get().getStreamCacheSizeBytes() }.getOrDefault(0L)
+            val count = runCatching { musicPlayer.get().getStreamCachedSongCount() }.getOrDefault(0)
+            _streamCacheSizeBytes.value = bytes
+            _streamCachedSongCount.value = count
+        }
+    }
+
+    fun setStreamCacheEnabled(enabled: Boolean) = launchSettingsAction("update stream caching") {
+        settingsPreferences.setStreamCacheEnabled(enabled)
+        refreshStreamCacheStats()
+    }
+
+    fun setStreamCacheSongLimit(limit: Int) = launchSettingsAction("update stream cache capacity") {
+        settingsPreferences.setStreamCacheSongLimit(limit)
+        refreshStreamCacheStats()
+    }
+
+    fun clearStreamCache() {
+        launchSettingsAction("clear stream cache") {
+            musicPlayer.get().clearStreamCache()
+            kotlinx.coroutines.delay(400)
+            refreshStreamCacheStats()
+            _uiState.update { it.copy(toastMessage = "Stream cache cleared") }
         }
     }
 }

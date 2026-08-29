@@ -244,6 +244,7 @@ fun SettingsScreen(
     val eq by viewModel.equalizer.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showQualityDialog by remember { mutableStateOf(false) }
+    var showCacheCapacityDialog by remember { mutableStateOf(false) }
     var showEqSheet by remember { mutableStateOf(false) }
     var showLyricsAnimationSheet by remember { mutableStateOf(false) }
     var showSyncPlaylistsSheet by remember { mutableStateOf(false) }
@@ -669,6 +670,58 @@ fun SettingsScreen(
                                 },
                                 checked = misc.downloadLyrics,
                                 onCheckedChange = viewModel::setDownloadLyrics,
+                                position = position,
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SectionLabel("Stream Cache & Storage")
+
+                    val cacheBytes by viewModel.streamCacheSizeBytes.collectAsStateWithLifecycle()
+                    val cacheCount by viewModel.streamCachedSongCount.collectAsStateWithLifecycle()
+                    val cacheMb = (cacheBytes.toDouble() / (1024 * 1024)).let { "%.1f".format(it) }
+
+                    val songLimit = misc.streamCacheSongLimit
+                    val estimatedGb = ((songLimit * 30L).toDouble() / 1024).let { "%.1f".format(it) }
+                    val capacitySubtitle = "$songLimit songs (~$estimatedGb GB max)"
+
+                    val totalCacheRows = if (misc.streamCacheEnabled) 3 else 1
+                    SettingsGroup(rowCount = totalCacheRows) { index, position ->
+                        when (index) {
+                            0 -> SettingsToggleCard(
+                                icon = Icons.Filled.Download,
+                                iconContainer = MaterialTheme.colorScheme.primaryContainer,
+                                iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                title = "Cache Streamed Songs",
+                                subtitle = if (misc.streamCacheEnabled) {
+                                    "Auto-cache played songs for instant offline replay and data savings"
+                                } else {
+                                    "Streaming audio data is discarded immediately after playback"
+                                },
+                                checked = misc.streamCacheEnabled,
+                                onCheckedChange = viewModel::setStreamCacheEnabled,
+                                position = position,
+                            )
+                            1 -> SettingsActionCard(
+                                icon = Icons.Filled.Tune,
+                                iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                                iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                title = "Cache Capacity",
+                                subtitle = capacitySubtitle,
+                                onClick = { showCacheCapacityDialog = true },
+                                position = position,
+                            )
+                            2 -> SettingsActionCard(
+                                icon = Icons.Filled.Delete,
+                                iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
+                                iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                title = "Clear Stream Cache",
+                                subtitle = if (cacheBytes > 0) "$cacheMb MB used • $cacheCount cached track(s)" else "Cache is empty",
+                                onClick = viewModel::clearStreamCache,
                                 position = position,
                             )
                         }
@@ -1103,6 +1156,136 @@ fun SettingsScreen(
                                             )
                                         }
                                     }
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        subtitle,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Check,
+                                            contentDescription = "Selected",
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showCacheCapacityDialog) {
+        val capacityOptions = listOf(
+            Triple(25, "25 Songs", "~750 MB storage ceiling • Ideal for low-storage devices"),
+            Triple(50, "50 Songs (Recommended)", "~1.5 GB storage ceiling • Balanced offline replay"),
+            Triple(100, "100 Songs", "~3.0 GB storage ceiling • Extensive cache buffer"),
+            Triple(200, "200 Songs", "~6.0 GB storage ceiling • Heavy listening cache"),
+            Triple(500, "500 Songs", "~15.0 GB storage ceiling • Maximum offline capacity"),
+        )
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+
+        ModalBottomSheet(
+            onDismissRequest = { showCacheCapacityDialog = false },
+            sheetState = sheetState,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            dragHandle = {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .padding(top = 12.dp, bottom = 8.dp)
+                        .size(width = 36.dp, height = 4.dp),
+                ) {}
+            },
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 24.dp + safeDrawingBottomPadding()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.Tune,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            "Stream Cache Capacity",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            "Maximum song count retained in local cache",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                Text(
+                    "When the limit is reached, older played songs are automatically evicted in Least-Recently-Used (LRU) order.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    capacityOptions.forEach { (limit, title, subtitle) ->
+                        val isSelected = misc.streamCacheSongLimit == limit
+                        Surface(
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                viewModel.setStreamCacheSongLimit(limit)
+                                showCacheCapacityDialog = false
+                            },
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                            shadowElevation = if (isSelected) 3.dp else 0.dp,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        title,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                    )
                                     Spacer(Modifier.height(4.dp))
                                     Text(
                                         subtitle,
