@@ -853,6 +853,18 @@ class MusicPlayer @Inject constructor(
             it.copy(sleepTimerRemainingMs = sleepTimerDeadlineMs?.minus(SystemClock.elapsedRealtime()))
         }
     }
+    fun setSleepTimer(minutes: Int) = onMain {
+        if (minutes <= 0) {
+            sleepTimerDeadlineMs = null
+            sleepTimerStep = 0
+        } else {
+            sleepTimerDeadlineMs = SystemClock.elapsedRealtime() + minutes * 60_000L
+            sleepTimerStep = SLEEP_TIMER_MINUTES.indexOf(minutes).let { if (it >= 0) it else 0 }
+        }
+        _state.update {
+            it.copy(sleepTimerRemainingMs = sleepTimerDeadlineMs?.minus(SystemClock.elapsedRealtime())?.coerceAtLeast(0))
+        }
+    }
     fun clearUpcoming() = onMain {
         disableDiscoverQueue()
         val current = player.currentMediaItemIndex

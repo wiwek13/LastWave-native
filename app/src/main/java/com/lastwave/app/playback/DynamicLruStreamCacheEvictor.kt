@@ -18,6 +18,8 @@ class DynamicLruStreamCacheEvictor(
     private val leastRecentlyUsed = TreeSet<CacheSpan>(this)
     private var currentSize: Long = 0
 
+    val currentSizeBytes: Long get() = currentSize
+
     override fun requiresCacheSpanTouches(): Boolean = true
 
     override fun onCacheInitialized() {}

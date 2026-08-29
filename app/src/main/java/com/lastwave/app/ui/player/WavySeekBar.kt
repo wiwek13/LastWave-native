@@ -608,7 +608,7 @@ fun MiniWavyProgress(
         initialValue = 0f,
         targetValue = (2 * PI).toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3100, easing = LinearEasing),
+            animation = tween(durationMillis = 1800, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "MiniPhase2",
@@ -617,7 +617,7 @@ fun MiniWavyProgress(
         initialValue = 0f,
         targetValue = (2 * PI).toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1900, easing = LinearEasing),
+            animation = tween(durationMillis = 1300, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "MiniPhase3",
@@ -635,6 +635,7 @@ fun MiniWavyProgress(
     val pathContour1 = remember { Path() }
     val pathContour2 = remember { Path() }
     val pathContour3 = remember { Path() }
+    val clipBounds = remember { Path() }
 
     Box(
         modifier = modifier
@@ -647,153 +648,165 @@ fun MiniWavyProgress(
         ) {
             val width = size.width
             val height = size.height
-            val centerY = height * 0.55f
-            val activeWidth = (width * progressFraction).coerceIn(0f, width)
+            val baseTrackThicknessPx = 2.5.dp.toPx()
+            val halfThickness = baseTrackThicknessPx / 2f
+            val centerY = height - halfThickness - 1.5.dp.toPx()
+            val topBaselineY = centerY - halfThickness
+            val bottomY = centerY + halfThickness
+            val thumbX = (width * progressFraction).coerceIn(0f, width)
 
-            // Inactive background bar
+            // Inactive background baseline bar
             drawLine(
                 color = inactiveColor,
                 start = Offset(0f, centerY),
                 end = Offset(width, centerY),
-                strokeWidth = 2.5.dp.toPx(),
+                strokeWidth = baseTrackThicknessPx,
                 cap = StrokeCap.Round,
             )
 
-            if (activeWidth > 1f) {
-                val waveLength1Px = 54.dp.toPx()
-                val waveLength2Px = 72.dp.toPx()
-                val waveLength3Px = 42.dp.toPx()
+            if (thumbX > 0.5f) {
+                clipBounds.reset()
+                clipBounds.addRoundRect(
+                    RoundRect(
+                        rect = androidx.compose.ui.geometry.Rect(
+                            left = -halfThickness,
+                            top = 0f,
+                            right = thumbX + halfThickness,
+                            bottom = height,
+                        ),
+                        topLeft = CornerRadius(halfThickness, halfThickness),
+                        bottomLeft = CornerRadius(halfThickness, halfThickness),
+                        topRight = CornerRadius(halfThickness, halfThickness),
+                        bottomRight = CornerRadius(halfThickness, halfThickness),
+                    )
+                )
 
-                val amp1 = 2.2.dp.toPx() * ampMulti
-                val amp2 = 1.6.dp.toPx() * ampMulti
-                val amp3 = 2.8.dp.toPx() * ampMulti
+                clipPath(clipBounds) {
+                    fun smootherstep(t: Float): Float {
+                        val c = t.coerceIn(0f, 1f)
+                        return c * c * c * (c * (c * 6f - 15f) + 10f)
+                    }
 
-                val currPhase1 = if (isPlaying) phase1 else 0f
-                val currPhase2 = if (isPlaying) -phase2 else 0f
-                val currPhase3 = if (isPlaying) phase3 * 1.25f else 0f
+                    val waveLength1Px = 70.dp.toPx()
+                    val waveLength2Px = 54.dp.toPx()
+                    val waveLength3Px = 40.dp.toPx()
 
-                fun populateMiniWave(filled: Path, contour: Path, waveLength: Float, amplitude: Float, phase: Float) {
-                    filled.reset()
-                    contour.reset()
-                    filled.moveTo(0f, height)
-                    var first = true
-                    var x = 0f
-                    val step = 3f
-                    while (x <= activeWidth) {
-                        val angle = (x / waveLength) * 2f * PI.toFloat() + phase
-                        val y = centerY - sin(angle) * amplitude
-                        if (first) {
-                            filled.lineTo(x, y)
-                            contour.moveTo(x, y)
-                            first = false
-                        } else {
+                    val amp1 = 2.4.dp.toPx() * ampMulti
+                    val amp2 = 1.8.dp.toPx() * ampMulti
+                    val amp3 = 2.8.dp.toPx() * ampMulti
+
+                    val currPhase1 = if (isPlaying) phase1 + 2.2f else 2.2f
+                    val currPhase2 = if (isPlaying) phase2 + 1.2f else 1.2f
+                    val currPhase3 = if (isPlaying) phase3 else 0f
+
+                    val transitionLengthPx = 20.dp.toPx()
+                    val stepPx = 1.5.dp.toPx()
+
+                    fun populateMiniWave(
+                        filled: Path,
+                        contour: Path,
+                        wavelength: Float,
+                        amplitude: Float,
+                        phase: Float,
+                    ) {
+                        filled.reset()
+                        contour.reset()
+                        filled.moveTo(0f, bottomY)
+                        filled.lineTo(0f, topBaselineY)
+                        contour.moveTo(0f, topBaselineY)
+
+                        var x = 0f
+                        val effectiveTransition = minOf(transitionLengthPx, thumbX * 0.48f)
+                        val invTransition = if (effectiveTransition > 0f) 1f / effectiveTransition else 0f
+                        val invWavelength2Pi = (2 * PI / wavelength).toFloat()
+                        while (x < thumbX) {
+                            val startEnv = if (invTransition > 0f) smootherstep(x * invTransition) else 1f
+                            val endEnv = if (invTransition > 0f) smootherstep((thumbX - x) * invTransition) else 1f
+                            val envelope = startEnv * endEnv
+
+                            val angle = x * invWavelength2Pi - phase
+                            val waveHeight = (0.5f + 0.5f * sin(angle)) * amplitude * envelope
+                            val y = topBaselineY - waveHeight
+
                             filled.lineTo(x, y)
                             contour.lineTo(x, y)
+                            x += stepPx
                         }
-                        x += step
+                        filled.lineTo(thumbX, topBaselineY)
+                        contour.lineTo(thumbX, topBaselineY)
+                        filled.lineTo(thumbX, bottomY)
+                        filled.close()
                     }
-                    val endAngle = (activeWidth / waveLength) * 2f * PI.toFloat() + phase
-                    val endY = centerY - sin(endAngle) * amplitude
-                    filled.lineTo(activeWidth, endY)
-                    contour.lineTo(activeWidth, endY)
-                    filled.lineTo(activeWidth, height)
-                    filled.close()
+
+                    populateMiniWave(pathFilled1, pathContour1, waveLength1Px, amp1, currPhase1)
+                    populateMiniWave(pathFilled2, pathContour2, waveLength2Px, amp2, currPhase2)
+                    populateMiniWave(pathFilled3, pathContour3, waveLength3Px, amp3, currPhase3)
+
+                    val topWaveY = topBaselineY - maxOf(amp1, maxOf(amp2, amp3))
+
+                    // Fills
+                    drawPath(
+                        path = pathFilled1,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(layer1Light.copy(alpha = 0.32f), layer1Dark.copy(alpha = 0.08f)),
+                            startY = topWaveY,
+                            endY = bottomY,
+                        ),
+                    )
+                    drawPath(
+                        path = pathFilled2,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(layer2Light.copy(alpha = 0.42f), layer2Dark.copy(alpha = 0.12f)),
+                            startY = topWaveY,
+                            endY = bottomY,
+                        ),
+                    )
+                    drawPath(
+                        path = pathFilled3,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(layer3Light.copy(alpha = 0.60f), layer3Dark.copy(alpha = 0.22f)),
+                            startY = topWaveY,
+                            endY = bottomY,
+                        ),
+                    )
+                    drawPath(
+                        path = pathFilled3,
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                layer3Light.copy(alpha = 0.35f),
+                                secondaryColor.copy(alpha = 0.22f),
+                                layer3Dark.copy(alpha = 0.40f)
+                            ),
+                            startX = 0f,
+                            endX = thumbX,
+                        ),
+                    )
+
+                    // Luminous Glow Contours
+                    drawPath(
+                        path = pathContour3,
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(layer3Light.copy(alpha = 0.50f), layer3Dark.copy(alpha = 0.30f)),
+                            startX = 0f,
+                            endX = thumbX,
+                        ),
+                        style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                    )
+
+                    // Baseline active bar
+                    drawLine(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(primaryColor, secondaryColor),
+                            startX = 0f,
+                            endX = thumbX,
+                        ),
+                        start = Offset(0f, centerY),
+                        end = Offset(thumbX, centerY),
+                        strokeWidth = baseTrackThicknessPx,
+                        cap = StrokeCap.Round,
+                    )
                 }
-
-                populateMiniWave(pathFilled1, pathContour1, waveLength1Px, amp1, currPhase1)
-                populateMiniWave(pathFilled2, pathContour2, waveLength2Px, amp2, currPhase2)
-                populateMiniWave(pathFilled3, pathContour3, waveLength3Px, amp3, currPhase3)
-
-                val topWaveY = centerY - maxOf(amp1, maxOf(amp2, amp3))
-
-                // Fills
-                drawPath(
-                    path = pathFilled1,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(layer1Light.copy(alpha = 0.28f), layer1Dark.copy(alpha = 0.08f)),
-                        startY = topWaveY,
-                        endY = height,
-                    ),
-                )
-                drawPath(
-                    path = pathFilled2,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(layer2Light.copy(alpha = 0.35f), layer2Dark.copy(alpha = 0.12f)),
-                        startY = topWaveY,
-                        endY = height,
-                    ),
-                )
-                drawPath(
-                    path = pathFilled3,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(layer3Light.copy(alpha = 0.50f), layer3Dark.copy(alpha = 0.20f)),
-                        startY = topWaveY,
-                        endY = height,
-                    ),
-                )
-                drawPath(
-                    path = pathFilled3,
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(layer3Light.copy(alpha = 0.30f), secondaryColor.copy(alpha = 0.20f), layer3Dark.copy(alpha = 0.35f)),
-                        startX = 0f,
-                        endX = activeWidth,
-                    ),
-                )
-
-                // Glow Halos
-                drawPath(
-                    path = pathContour3,
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(layer3Light.copy(alpha = 0.35f), layer3Dark.copy(alpha = 0.22f)),
-                        startX = 0f,
-                        endX = activeWidth,
-                    ),
-                    style = Stroke(width = 4.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
-                )
-
-                // Contours
-                drawPath(
-                    path = pathContour1,
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(layer1Light.copy(alpha = 0.40f), layer1Dark.copy(alpha = 0.30f)),
-                        startX = 0f,
-                        endX = activeWidth,
-                    ),
-                    style = Stroke(width = 0.9.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
-                )
-                drawPath(
-                    path = pathContour2,
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(layer2Dark.copy(alpha = 0.65f), layer2Light.copy(alpha = 0.55f)),
-                        startX = 0f,
-                        endX = activeWidth,
-                    ),
-                    style = Stroke(width = 1.0.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
-                )
-                drawPath(
-                    path = pathContour3,
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(layer3Light, layer3Dark),
-                        startX = 0f,
-                        endX = activeWidth,
-                    ),
-                    style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
-                )
-
-                // Baseline
-                drawLine(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(layer3Light, layer3Dark),
-                        startX = 0f,
-                        endX = activeWidth,
-                    ),
-                    start = Offset(0f, centerY),
-                    end = Offset(activeWidth, centerY),
-                    strokeWidth = 2.0.dp.toPx(),
-                    cap = StrokeCap.Round,
-                )
             }
         }
     }
 }
-
