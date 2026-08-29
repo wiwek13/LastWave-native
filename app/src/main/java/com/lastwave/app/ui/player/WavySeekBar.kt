@@ -352,6 +352,66 @@ fun WavySeekBar(
                             ),
                         )
 
+                        // ── Gradient Glow Halos (Subtle luminous bloom along wave crests) ──
+
+                        // Layer 1 Ambient Glow
+                        drawPath(
+                            path = pathContour1,
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    layer1Light.copy(alpha = if (isTranslucent) 0.24f else 0.18f),
+                                    layer1Dark.copy(alpha = if (isTranslucent) 0.16f else 0.12f),
+                                ),
+                                startX = 0f,
+                                endX = activeWidth,
+                            ),
+                            style = Stroke(width = 4.0.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                        )
+
+                        // Layer 2 Harmonic Glow
+                        drawPath(
+                            path = pathContour2,
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    layer2Dark.copy(alpha = if (isTranslucent) 0.32f else 0.24f),
+                                    layer2Light.copy(alpha = if (isTranslucent) 0.26f else 0.18f),
+                                ),
+                                startX = 0f,
+                                endX = activeWidth,
+                            ),
+                            style = Stroke(width = 5.0.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                        )
+
+                        // Layer 3 Primary Outer Soft Glow
+                        drawPath(
+                            path = pathContour3,
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    layer3Light.copy(alpha = if (isTranslucent) 0.42f else 0.32f),
+                                    layer3Dark.copy(alpha = if (isTranslucent) 0.32f else 0.22f),
+                                ),
+                                startX = 0f,
+                                endX = activeWidth,
+                            ),
+                            style = Stroke(width = 6.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                        )
+
+                        // Layer 3 Primary Inner Focused Halo
+                        drawPath(
+                            path = pathContour3,
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    layer3Light.copy(alpha = if (isTranslucent) 0.65f else 0.52f),
+                                    layer3Dark.copy(alpha = if (isTranslucent) 0.52f else 0.40f),
+                                ),
+                                startX = 0f,
+                                endX = activeWidth,
+                            ),
+                            style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                        )
+
+                        // ── Crisp Contour Line Strokes ──
+
                         // Layer 1: Soft organic contour stroke
                         drawPath(
                             path = pathContour1,
@@ -394,7 +454,21 @@ fun WavySeekBar(
                             style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
                         )
 
-                        // 3. Crisp Baseline Bar with Light -> Dark dynamic gradient
+                        // 3. Baseline Bar Subtle Glow & Crisp Core Bar
+                        drawLine(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    layer3Light.copy(alpha = if (isTranslucent) 0.35f else 0.25f),
+                                    layer3Dark.copy(alpha = if (isTranslucent) 0.25f else 0.18f),
+                                ),
+                                startX = 0f,
+                                endX = activeWidth,
+                            ),
+                            start = Offset(0f, centerY),
+                            end = Offset(thumbX, centerY),
+                            strokeWidth = baseTrackThicknessPx + 3.dp.toPx(),
+                            cap = StrokeCap.Round,
+                        )
                         drawLine(
                             brush = Brush.horizontalGradient(
                                 colors = listOf(layer3Light, layer3Dark),
